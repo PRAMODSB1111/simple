@@ -1,0 +1,115 @@
+#include <stdio.h>
+#include <stdint.h>
+#include <stdbool.h>
+
+#include "FreeRTOS.h"
+#include "task.h"
+#include "semphr.h" // Include semaphore header file for mutex
+
+/* Include your hardware-specific headers here */
+#include "inc/hw_memmap.h"
+#include "driverlib/gpio.h"
+#include "driverlib/pin_map.h"
+#include "driverlib/sysctl.h"
+
+/*-----------------------------------------------------------*/
+
+static void prvLedTask(void *pvParameters);
+static void prvLedTask1(void *pvParameters);
+/* Mutex to protect GPIO operations */
+SemaphoreHandle_t xMutex;
+
+void vApplicationTickHook(void)
+{
+    /* This function will be called by each tick interrupt if
+        configUSE_TICK_HOOK is set to 1 in FreeRTOSConfig.h.
+        User code can be added here, but the tick hook is called
+        from an interrupt context, so code must not attempt to block,
+        and only the interrupt-safe FreeRTOS API functions can be used.
+    */
+}
+
+int main(void)
+{
+    /* Initialize your hardware and other configurations here */
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF); // Enable GPIOF peripheral
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPION);
+    GPIOPinTypeGPIOOutput(GPIO_PORTF_BASE, GPIO_PIN_0 );
+    GPIOPinTypeGPIOOutput(GPIO_PORTN_BASE, (GPIO_PIN_0 ));
+
+    /* Create a mutex to protect GPIO operations */
+    xMutex = xSemaphoreCreateMutex();
+
+    /* Create tasks to handle LED operations */
+    xTaskCreate(prvLedTask, "LedTask1", configMINIMAL_STACK_SIZE, (void *)GPIO_PIN_0, tskIDLE_PRIORITY + 1, NULL);
+    xTaskCreate(prvLedTask1, "LedTask3", configMINIMAL_STACK_SIZE, (void *)GPIO_PIN_0, tskIDLE_PRIORITY + 1, NULL);
+
+    /* Start the FreeRTOS scheduler */
+    vTaskStartScheduler();
+
+    return 0;
+}
+
+static void prvLedTask(void *pvParameters)
+{
+    uint32_t ui32Pin = (uint32_t)pvParameters;
+
+    for (;;)
+    {
+        /* Acquire the GPIO mutex before changing pin state */
+        xSemaphoreTake(xMutex, portMAX_DELAY);
+
+        /* Toggle the LED pin state */
+        GPIOPinWrite(GPIO_PORTF_BASE, ui32Pin, ui32Pin);
+
+        /* Release the GPIO mutex */
+        xSemaphoreGive(xMutex);
+
+        /* Create a 1-second delay */
+        vTaskDelay(pdMS_TO_TICKS(1000));
+
+        /* Acquire the GPIO mutex before changing pin state */
+        xSemaphoreTake(xMutex, portMAX_DELAY);
+
+        /* Toggle the LED pin state back */
+        GPIOPinWrite(GPIO_PORTF_BASE, ui32Pin, 0);
+
+        /* Release the GPIO mutex */
+        xSemaphoreGive(xMutex);
+
+        /* Create a 1-second delay */
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+}
+static void prvLedTask1(void *pvParameters)
+{
+    uint32_t ui32Pin = (uint32_t)pvParameters;
+
+    for (;;)
+    {
+        /* Acquire the GPIO mutex before changing pin state */
+        xSemaphoreTake(xMutex, portMAX_DELAY);
+
+        /* Toggle the LED pin state */
+        GPIOPinWrite(GPIO_PORTN_BASE, ui32Pin, ui32Pin);
+
+        /* Release the GPIO mutex */
+        xSemaphoreGive(xMutex);
+
+        /* Create a 1-second delay */
+        vTaskDelay(pdMS_TO_TICKS(1000));
+
+        /* Acquire the GPIO mutex before changing pin state */
+        xSemaphoreTake(xMutex, portMAX_DELAY);
+
+        /* Toggle the LED pin state back */
+        GPIOPinWrite(GPIO_PORTN_BASE, ui32Pin, 0);
+
+        /* Release the GPIO mutex */
+        xSemaphoreGive(xMutex);
+
+        /* Create a 1-second delay */
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+}
+
